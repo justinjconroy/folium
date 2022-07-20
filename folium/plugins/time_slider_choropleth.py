@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from folium.elements import JSCSSMixin
 from folium.features import GeoJson
 from folium.map import Layer
@@ -5,7 +7,7 @@ from folium.map import Layer
 from jinja2 import Template
 
 
-class TimeSliderChoropleth(JSCSSMixin, Layer):
+class TimeSliderChoroplethCustom(JSCSSMixin, Layer):
     """
     Creates a TimeSliderChoropleth plugin to append into a map with Map.add_child.
 
@@ -30,7 +32,12 @@ class TimeSliderChoropleth(JSCSSMixin, Layer):
         {% macro script(this, kwargs) %}
             var timestamps = {{ this.timestamps|tojson }};
             var styledict = {{ this.styledict|tojson }};
-            var current_timestamp = timestamps[0];
+            var customlbl = {{ this.customlbl|tojson }};
+
+            var current_hrblock = parseInt(JSON.parse(window.localStorage.getItem('current_slider_value')));
+
+            var current_timestamp = timestamps[current_hrblock];
+            var current_lbl = customlbl[current_hrblock];
 
             // insert time slider
             d3.select("body").insert("p", ":first-child").append("input")
@@ -38,21 +45,18 @@ class TimeSliderChoropleth(JSCSSMixin, Layer):
                 .attr("width", "100px")
                 .attr("min", 0)
                 .attr("max", timestamps.length - 1)
-                .attr("value", 0)
+                .attr("value", current_hrblock)
                 .attr("id", "slider")
                 .attr("step", "1")
                 .style('align', 'center');
-
+            
             // insert time slider output BEFORE time slider (text on top of slider)
-            d3.select("body").insert("p", ":first-child").append("output")
+            d3.select("body").insert("p", ":first-child").append("xhtml")
                 .attr("width", "100")
                 .attr("id", "slider-value")
                 .style('font-size', '18px')
                 .style('text-align', 'center')
                 .style('font-weight', '500%');
-
-            var datestring = new Date(parseInt(current_timestamp)*1000).toDateString();
-            d3.select("output#slider-value").text(datestring);
 
             fill_map = function(){
                 for (var feature_id in styledict){
@@ -71,8 +75,12 @@ class TimeSliderChoropleth(JSCSSMixin, Layer):
 
             d3.select("#slider").on("input", function() {
                 current_timestamp = timestamps[this.value];
-                var datestring = new Date(parseInt(current_timestamp)*1000).toDateString();
-                d3.select("output#slider-value").text(datestring);
+                current_lbl = customlbl[this.value];
+                var dateslider = new Date(parseInt(current_timestamp)*1000);
+                dateslider = changeTimezone(dateslider, "America/Los_Angeles");
+                var datestring = "<strong>Date: </strong>" + dateslider.toLocaleDateString() + " <strong>- Time: </strong>" + dateslider.toLocaleTimeString() + " (PST)";
+                d3.select("xhtml#slider-value").html("<p style='text-align:center; font-family: Garamond, serif;'>" + datestring + current_lbl + "</p>");
+                window.localStorage.setItem('current_slider_value', this.value);
                 fill_map();
             });
 
@@ -110,7 +118,23 @@ class TimeSliderChoropleth(JSCSSMixin, Layer):
                 }
             });
 
-            function onOverlayAdd(e) {
+         function changeTimezone(date, ianatz) {
+
+              // suppose the date is 12:00 UTC
+              var invdate = new Date(date.toLocaleString('en-US', {
+                timeZone: ianatz
+              }));
+
+              // then invdate will be 07:00 in Toronto
+              // and the diff is 5 hours
+              var diff = date.getTime() - invdate.getTime();
+
+              // so 12:00 in Toronto is 17:00 UTC
+              return new Date(date.getTime() - diff); // needs to substract
+
+            }
+
+	    function onOverlayAdd(e) {
                 {{ this.get_name() }}.eachLayer(function (layer) {
                     layer._path.id = 'feature-' + layer.feature.id;
                 });
@@ -123,9 +147,17 @@ class TimeSliderChoropleth(JSCSSMixin, Layer):
 
                 fill_map();
             }
+
             {{ this._parent.get_name() }}.on('overlayadd', onOverlayAdd);
 
+
             onOverlayAdd(); // fill map as layer is loaded
+            
+            var dateslider = new Date(parseInt(current_timestamp)*1000);
+            dateslider = changeTimezone(dateslider, "America/Los_Angeles");
+            var datestring = "<strong>Date: </strong>" + dateslider.toLocaleDateString() + " <strong>- Time: </strong>" + dateslider.toLocaleTimeString() + " (PST)";
+            d3.select("xhtml#slider-value").html("<p style='text-align:center; font-family: Garamond, serif;'>" + datestring + current_lbl + "</p>");
+
         {% endmacro %}
         """)
 
@@ -134,9 +166,9 @@ class TimeSliderChoropleth(JSCSSMixin, Layer):
          'https://d3js.org/d3.v4.min.js')
     ]
 
-    def __init__(self, data, styledict, name=None, overlay=True, control=True,
+    def __init__(self, data, styledict, customlbl=[], name=None, overlay=True, control=True,
                  show=True):
-        super(TimeSliderChoropleth, self).__init__(name=name, overlay=overlay,
+        super(TimeSliderChoroplethCustom, self).__init__(name=name, overlay=overlay,
                                                    control=control, show=show)
         self.data = GeoJson.process_data(GeoJson({}), data)
 
@@ -154,3 +186,10 @@ class TimeSliderChoropleth(JSCSSMixin, Layer):
 
         self.timestamps = timestamps
         self.styledict = styledict
+        if len(customlbl) == 0: 
+            raise ValueError('Oops!')
+            customlbl = ["" for x in range(len(timestamps))] #create empty string array if no custom label supplied
+        elif len(timestamps) != len(customlbl):
+            raise ValueError('Number of elements in customlbl must equal number of time stamps')
+        self.customlbl = customlbl
+        

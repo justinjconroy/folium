@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """
 Make beautiful, interactive maps with Python and Leaflet.js
 
@@ -179,14 +181,14 @@ class Map(JSCSSMixin, MacroElement):
         {% endmacro %}
 
         {% macro script(this, kwargs) %}
+            
             var {{ this.get_name() }} = L.map(
                 {{ this.get_name()|tojson }},
                 {
-                    center: {{ this.location|tojson }},
+                    center: JSON.parse(window.localStorage.getItem('current_center_value')),
                     crs: L.CRS.{{ this.crs }},
-                    {%- for key, value in this.options.items() %}
-                    {{ key }}: {{ value|tojson }},
-                    {%- endfor %}
+                    zoom: window.localStorage.getItem('current_zoom_value'),
+                    zoomControl: false
                 }
             );
 
@@ -203,6 +205,21 @@ class Map(JSCSSMixin, MacroElement):
             {{ this.get_name() }}.on("overlayadd", objects_in_front);
             $(document).ready(objects_in_front);
             {%- endif %}
+
+            
+
+            function onZoomEnd(e) {
+                window.localStorage.setItem('current_zoom_value', {{ this.get_name() }}.getZoom());
+            }
+
+            {{ this.get_name() }}.on('zoomend', onZoomEnd);
+            
+            function onMoveEnd(e) {
+                window.localStorage.setItem('current_center_value', JSON.stringify({{ this.get_name() }}.getCenter()));
+            }
+
+            {{ this.get_name() }}.on('moveend', onMoveEnd);
+            
 
         {% endmacro %}
         """)
@@ -235,7 +252,7 @@ class Map(JSCSSMixin, MacroElement):
             no_touch=False,
             disable_3d=False,
             png_enabled=False,
-            zoom_control=True,
+            zoom_control=False,
             **kwargs
     ):
         super(Map, self).__init__()
@@ -347,7 +364,7 @@ class Map(JSCSSMixin, MacroElement):
         figure.header.add_child(Element(
             '<style>html, body {'
             'width: 100%;'
-            'height: 100%;'
+            'height: 94%;'
             'margin: 0;'
             'padding: 0;'
             '}'
