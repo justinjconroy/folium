@@ -7,7 +7,7 @@ from folium.map import Layer
 from jinja2 import Template
 
 
-class TimeSliderChoroplethCustom(JSCSSMixin, Layer):
+class TimeSliderChoropleth(JSCSSMixin, Layer):
     """
     Creates a TimeSliderChoropleth plugin to append into a map with Map.add_child.
 
@@ -168,7 +168,7 @@ class TimeSliderChoroplethCustom(JSCSSMixin, Layer):
 
     def __init__(self, data, styledict, customlbl=[], name=None, overlay=True, control=True,
                  show=True):
-        super(TimeSliderChoroplethCustom, self).__init__(name=name, overlay=overlay,
+        super(TimeSliderChoropleth, self).__init__(name=name, overlay=overlay,
                                                    control=control, show=show)
         self.data = GeoJson.process_data(GeoJson({}), data)
 
